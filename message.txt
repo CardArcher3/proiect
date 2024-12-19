@@ -1,0 +1,107 @@
+import PySimpleGUI as sg
+import random
+
+class Birou:
+    def __init__(self, nume, ocupat, consum_echipamente=None):
+        self.nume = nume
+        self.ocupat = ocupat
+        self.consum_echipamente = consum_echipamente or {}
+
+    def consum_energie(self):
+        return sum(self.consum_echipamente.values()) if self.ocupat else 10
+
+class Etaj:
+    def __init__(self, numar, numar_birouri, consum_echipamente_birou, ocupare):
+        self.numar = numar
+        self.birouri = [Birou(f"Birou {i+1}", ocupare[i], consum_echipamente_birou) for i in range(numar_birouri)]
+
+    def consum_energie(self):
+        return sum(birou.consum_energie() for birou in self.birouri)
+
+class Cladire:
+    def __init__(self, nume, etaje, pret_kwh):
+        self.nume = nume
+        self.etaje = etaje
+        self.pret_kwh = pret_kwh
+
+    def consum_energie_total(self):
+        return sum(etaj.consum_energie() for etaj in self.etaje)
+
+    def cost_total_energie(self):
+        return self.consum_energie_total() * self.pret_kwh
+
+def obtinere_pret_energie():
+    return round(random.uniform(0.6, 1.2), 2)
+
+def interfata_grafica():
+    layout = [
+        [sg.Text('Detalii clădire')],
+        [sg.Text('Nume clădire'), sg.InputText(key='nume_cladire')],
+        [sg.Text('Număr etaje'), sg.InputText(key='numar_etaje')],
+        [sg.Text('Număr birouri pe etaj'), sg.InputText(key='numar_birouri')],
+        [sg.Button('Creare Cladire')],
+        [sg.Text('', size=(40, 10), key='output')],
+        [sg.Text('Pret energie (lei/kWh):', key='current_price')],
+        [sg.Text('... lei/kWh', size=(10, 1), key='pret_kwh_dynamic')],
+    ]
+
+    window = sg.Window('Gestionare Energie Clădire', layout)
+
+    while True:
+        event, values = window.read(timeout=10000)
+
+        if event == sg.WIN_CLOSED:
+            break
+
+        # Actualizare preț energie dinamic
+        pret_kwh_dynamic = obtinere_pret_energie()
+        window['pret_kwh_dynamic'].update(f'{pret_kwh_dynamic} lei/kWh')
+
+        if event == 'Creare Cladire':
+            try:
+                nume_cladire = values['nume_cladire']
+                numar_etaje = int(values['numar_etaje'])
+                numar_birouri = int(values['numar_birouri'])
+
+                # Colectează echipamentele pentru fiecare birou
+                echipamente_birou = {}
+                while True:
+                    echipament = sg.popup_get_text("Echipament birou (sau 'stop' pentru a termina): ")
+                    if echipament == 'stop':
+                        break
+                    if echipament:
+                        consum = float(sg.popup_get_text(f"Consum {echipament} (kWh): "))
+                        echipamente_birou[echipament] = consum
+
+                # Setează ocuparea birourilor
+                ocupare_birouri = []
+                for i in range(numar_etaje):
+                    ocupare_birouri_etaj = []
+                    for j in range(numar_birouri):
+                        ocupat = sg.popup_yes_no(f"Birou {j+1} Etaj {i+1} ocupat?")
+                        ocupare_birouri_etaj.append(ocupat == 'Yes')
+                    ocupare_birouri.append(ocupare_birouri_etaj)
+
+                # Creare clădire
+                etaje = [Etaj(i+1, numar_birouri, echipamente_birou, ocupare_birouri[i]) for i in range(numar_etaje)]
+                cladire = Cladire(nume_cladire, etaje, pret_kwh_dynamic)
+
+                # Calcul consum și cost
+                total_consum = cladire.consum_energie_total()
+                total_cost = cladire.cost_total_energie()
+
+                # Afișare rezultate
+                result = f"Consum total energie: {total_consum} kWh\n"
+                result += f"Cost total energie: {total_cost} lei\n"
+                for etaj in cladire.etaje:
+                    result += f"Consum energie etaj {etaj.numar}: {etaj.consum_energie()} kWh\n"
+                window['output'].update(result)
+
+            except ValueError:
+                sg.popup_error('Introduceți valori valide!')
+
+    window.close()
+
+# Program principal
+if __name__ == "__main__":
+    interfata_grafica()
